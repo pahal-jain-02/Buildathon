@@ -12,12 +12,15 @@ const taskCountEl = document.getElementById("task-count");
 const taskTotalEl = document.getElementById("task-total");
 
 const startTimeInput = document.getElementById("start-time");
-const bufferMinutesSelect = document.getElementById("buffer-minutes");
+const availableMinutesInput = document.getElementById("available-minutes");
 const generateBtn = document.getElementById("generate-btn");
 const clearScheduleBtn = document.getElementById("clear-schedule-btn");
 const scheduleListEl = document.getElementById("schedule-list");
 const scheduleEmptyEl = document.getElementById("schedule-empty");
 const scheduleSummaryEl = document.getElementById("schedule-summary");
+
+const BREAK_MINUTES = 5;
+const DEFAULT_EMPTY_TEXT = scheduleEmptyEl.textContent;
 
 function loadTasks() {
   try {
@@ -95,21 +98,72 @@ function parseStartTime(value) {
   return h * 60 + m;
 }
 
+/**
+ * Picks the subset of tasks whose combined duration (plus a break between
+ * each pair) best fills the given budget without exceeding it. A schedule
+ * of k tasks costs sum(durations) + BREAK_MINUTES * (k - 1), so weighting
+ * each task as duration + BREAK_MINUTES turns this into a standard 0/1
+ * knapsack: maximize total duration subject to sum(weights) <= budget +
+ * BREAK_MINUTES.
+ */
+function selectTasksForBudget(taskPool, budgetMinutes) {
+  const n = taskPool.length;
+  if (n === 0 || budgetMinutes <= 0) return { selected: [], totalDuration: 0 };
+
+  const capacity = budgetMinutes + BREAK_MINUTES;
+  const dp = Array.from({ length: n + 1 }, () => new Array(capacity + 1).fill(0));
+
+  for (let i = 1; i <= n; i++) {
+    const weight = taskPool[i - 1].duration + BREAK_MINUTES;
+    const duration = taskPool[i - 1].duration;
+    for (let c = 0; c <= capacity; c++) {
+      dp[i][c] = dp[i - 1][c];
+      if (weight <= c) {
+        const candidate = dp[i - 1][c - weight] + duration;
+        if (candidate > dp[i][c]) dp[i][c] = candidate;
+      }
+    }
+  }
+
+  const selected = [];
+  let c = capacity;
+  for (let i = n; i >= 1; i--) {
+    if (dp[i][c] !== dp[i - 1][c]) {
+      const task = taskPool[i - 1];
+      selected.push(task);
+      c -= task.duration + BREAK_MINUTES;
+    }
+  }
+  selected.reverse();
+
+  const totalDuration = selected.reduce((sum, t) => sum + t.duration, 0);
+  return { selected, totalDuration };
+}
+
 function generateSchedule() {
   scheduleListEl.innerHTML = "";
 
   if (tasks.length === 0) {
+    scheduleEmptyEl.textContent = DEFAULT_EMPTY_TEXT;
+    scheduleEmptyEl.classList.remove("hidden");
+    scheduleSummaryEl.textContent = "";
+    return;
+  }
+
+  const budget = Math.max(0, Math.round(Number(availableMinutesInput.value) || 0));
+  const { selected, totalDuration } = selectTasksForBudget(tasks, budget);
+
+  if (selected.length === 0) {
+    scheduleEmptyEl.textContent = `No task fits in ${budget} min. Try more time or a shorter task.`;
     scheduleEmptyEl.classList.remove("hidden");
     scheduleSummaryEl.textContent = "";
     return;
   }
   scheduleEmptyEl.classList.add("hidden");
 
-  const buffer = Number(bufferMinutesSelect.value);
   let cursor = parseStartTime(startTimeInput.value || "09:00");
-  const scheduleStart = cursor;
 
-  tasks.forEach((task, index) => {
+  selected.forEach((task, index) => {
     const start = cursor;
     const end = cursor + task.duration;
 
@@ -123,17 +177,15 @@ function generateSchedule() {
     li.querySelector(".task-name").textContent = task.name;
     scheduleListEl.appendChild(li);
 
-    cursor = end + (index < tasks.length - 1 ? buffer : 0);
+    cursor = end + (index < selected.length - 1 ? BREAK_MINUTES : 0);
   });
 
-  const totalSpan = cursor - scheduleStart;
-  const hours = Math.floor(totalSpan / 60);
-  const mins = totalSpan % 60;
-  const spanText = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  const totalUsed = totalDuration + BREAK_MINUTES * (selected.length - 1);
+  const leftover = budget - totalUsed;
 
   scheduleSummaryEl.innerHTML = `
-    <span>${tasks.length} task${tasks.length === 1 ? "" : "s"} scheduled</span>
-    <span>Finishes ${formatTime(cursor)} &middot; spans ${spanText}</span>
+    <span>${selected.length} of ${tasks.length} task${tasks.length === 1 ? "" : "s"} &middot; ${totalDuration} min of work</span>
+    <span>${totalUsed} of ${budget} min used (${leftover} left over) &middot; finishes ${formatTime(cursor)}</span>
   `;
 }
 
@@ -142,6 +194,7 @@ generateBtn.addEventListener("click", generateSchedule);
 clearScheduleBtn.addEventListener("click", () => {
   scheduleListEl.innerHTML = "";
   scheduleSummaryEl.textContent = "";
+  scheduleEmptyEl.textContent = DEFAULT_EMPTY_TEXT;
   scheduleEmptyEl.classList.remove("hidden");
 });
 
