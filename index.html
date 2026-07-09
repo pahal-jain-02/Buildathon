@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TimeWeaver</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>TimeWeaver</h1>
+    <p class="tagline">Bank your tasks. Weave your day.</p>
+  </header>
+
+  <main class="split">
+    <!-- LEFT: Task Bank -->
+    <section class="pane task-bank">
+      <h2>Task Bank</h2>
+
+      <form id="task-form" class="task-form">
+        <input
+          type="text"
+          id="task-name"
+          placeholder="Task name (e.g. Write proposal)"
+          autocomplete="off"
+          required
+        />
+        <select id="task-duration">
+          <option value="15">15 min</option>
+          <option value="30" selected>30 min</option>
+          <option value="45">45 min</option>
+          <option value="60">60 min</option>
+        </select>
+        <button type="submit">Add Task</button>
+      </form>
+
+      <div class="bank-summary">
+        <span id="task-count">0 tasks</span>
+        <span id="task-total">0 min total</span>
+      </div>
+
+      <ul id="task-list" class="task-list"></ul>
+
+      <p id="bank-empty" class="empty-state">
+        No tasks yet — add one above to get started.
+      </p>
+    </section>
+
+    <!-- RIGHT: Schedule Generator -->
+    <section class="pane schedule-generator">
+      <h2>Schedule Generator</h2>
+
+      <div class="generator-controls">
+        <label for="start-time">Start time</label>
+        <input type="time" id="start-time" value="09:00" />
+
+        <label for="buffer-minutes">Buffer between tasks</label>
+        <select id="buffer-minutes">
+          <option value="0" selected>No buffer</option>
+          <option value="5">5 min</option>
+          <option value="10">10 min</option>
+          <option value="15">15 min</option>
+        </select>
+
+        <div class="generator-actions">
+          <button id="generate-btn" type="button">Generate Schedule</button>
+          <button id="clear-schedule-btn" type="button" class="secondary">Clear</button>
+        </div>
+      </div>
+
+      <div id="schedule-summary" class="schedule-summary"></div>
+
+      <ol id="schedule-list" class="schedule-list"></ol>
+
+      <p id="schedule-empty" class="empty-state">
+        Add tasks to the Task Bank, then generate a schedule.
+      </p>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
